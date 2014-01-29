@@ -9,8 +9,11 @@ void run_proc(proc_context* proc) {
   if (child) {
     waitpid(child, &status, 0);
   } else {
-    //printf("%s %s \n", proc->command, proc->args[1]);
+    //printf("%s %s \n", proc->command, proc->args[0]);
     execvp(proc->command, proc->args);
+
+    //char *arr[] = {"./two", "2", NULL};
+    //execvp("./two", arr);
     //char *arr[] = {"ls", "-a", NULL};
     //execvp("ls", arr);
     exit(-1);
@@ -48,7 +51,14 @@ int main(int argc, char *argv[]) {
       }
       num_procs++;
     } else {
-      args[arg_counter] = argv[index];
+      if (arg_counter == 0) {
+        char *arr = malloc(sizeof(char) * (strlen(argv[index])+2));
+        strcpy(arr, "./");
+        strcat(arr, argv[index]);
+        args[arg_counter] = arr;
+      } else {
+        args[arg_counter] = argv[index];
+      }
       arg_counter++;
     }
     index++;
