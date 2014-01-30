@@ -12,5 +12,7 @@ typedef struct context_st {
   struct proc_context *next;
 } proc_context;
 
-extern proc_context* add_proc(char** args, int argc);
-extern void run_proc(proc_context* proc);
+extern proc_context* add_proc(char** args, int arg_counter);
+extern void run_proc(proc_context* proc, int quantum);
+extern char* append_path(char *arg);
+extern void run_all_procs(proc_context *curr_proc, int quantum);
