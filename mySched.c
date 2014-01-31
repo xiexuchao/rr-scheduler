@@ -22,8 +22,8 @@ void fork_all_procs(struct context_st *first_proc) {
   while(curr_proc->pid == -1) {
     if (child = fork()) {
       curr_proc->pid = child;
-      kill(child, SIGSTOP);
     } else {
+      raise(SIGSTOP);
       execvp(curr_proc->command, curr_proc->args);
       exit(1);
     }
