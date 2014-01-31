@@ -91,7 +91,7 @@ int main(int argc, char *argv[]) {
   struct context_st *curr_proc = NULL;
   struct context_st *first_proc = NULL;
   struct context_st *last_proc = NULL;
-  int new_proc = 0;
+  int new_proc = 0, num_proc = 0, num_args = 0;
   char **curr_arg = argv + 2;
 
   while (curr_arg[0] != NULL) {
@@ -99,6 +99,7 @@ int main(int argc, char *argv[]) {
       new_proc = 1;
       last_proc = curr_proc;
       curr_proc = init_proc(curr_arg);
+      num_proc++;
       if (first_proc == NULL) {
         first_proc = curr_proc;
         curr_proc->next = curr_proc;
@@ -110,11 +111,23 @@ int main(int argc, char *argv[]) {
         first_proc->prev = curr_proc;
       }
     } else {
-      if (strcmp(curr_arg[0], ":") == 0) {
-        curr_arg[0] = NULL;
-        new_proc = 0;
+      if (num_proc > MAX_PROCESSES) {
+        fputs("There were too many processes entered.\n", stderr);
+        return EXIT_FAILURE;
+      }
+      else if(num_args > MAX_ARGUMENTS) {
+        fputs("There were too many arguments entered.\n", stderr);
+        return EXIT_FAILURE;
+      }
+      else {
+        if (!strcmp(curr_arg[0], ":")) {
+          curr_arg[0] = NULL;
+          new_proc = 0;
+          num_args = 0;
+        }
       }
       curr_arg++;
+      num_args++;
     }
   }
 
