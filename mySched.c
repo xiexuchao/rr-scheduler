@@ -2,7 +2,7 @@
 
 struct itimerval intervalTimer;
 struct sigaction alarmSig;
-int pid;
+int curr_pid;
 
 // creates proc context
 struct context_st* init_proc(char** args) {
@@ -11,15 +11,6 @@ struct context_st* init_proc(char** args) {
   proc->command = proc->args[0];
   proc->pid = -1;
   return proc;
-}
-
-// sets path string for command for executables
-char* append_path(char *arg) {
-  int str_len = strlen(arg) + strlen("./");
-  char *str = malloc(sizeof(char) * str_len);
-  strcpy(str, "./");
-  strcat(str, arg);
-  return str;
 }
 
 // Creates all the child processes, sets up piping for debugging output
@@ -42,20 +33,20 @@ void fork_all_procs(struct context_st *first_proc) {
 
 // Catches sig and stops proc
 void alarm_sig_catch(int signum) {
-  kill(pid, SIGSTOP);
+  kill(curr_pid, SIGSTOP);
 }
 
 // remove finished proc from linked list and free
 struct context_st* remove_proc(struct context_st *curr_proc) {
   struct context_st *temp = curr_proc;
-  if (curr_proc->prev == curr_proc) {
+  if (curr_proc->prev == curr_proc || curr_proc->next == curr_proc) {
     free(temp);
     temp = NULL;
     return temp;
-  } else {
-    curr_proc = (temp->prev)->next = temp->next;
-    (temp->next)->prev = temp->prev;
   }
+  curr_proc = temp->next;
+  (temp->prev)->next = temp->next;
+  (temp->next)->prev = temp->prev;
   free(temp);
   return curr_proc;
 }
@@ -71,7 +62,7 @@ void run_all_procs(struct context_st *first_proc, int quantum) {
   sigaction(SIGALRM, &alarmSig, NULL);
 
   while(curr_proc) {
-    pid = curr_proc->pid;
+    curr_pid = curr_proc->pid;
     kill(curr_proc->pid, SIGCONT);
     new_itimer(quantum);
     setitimer(ITIMER_REAL, &intervalTimer, NULL);
@@ -97,24 +88,21 @@ void new_itimer(int quantum) {
 int main(int argc, char *argv[]) {
   // 0 is schedule, 1 is quantum, 2 starts args
   int quantum = strtol(argv[1], NULL, 0);
-  int index = 2;
-  char *args[MAX_ARGUMENTS];
-  int arg_counter = 0;
   struct context_st *curr_proc = NULL;
   struct context_st *first_proc = NULL;
   struct context_st *last_proc = NULL;
-  int parsingArgs = 0;
+  int new_proc = 0;
+  char **curr_arg = argv + 2;
 
-  new_itimer(quantum);
-
-  argv = argv + 2;
-  while (argv[0] != NULL) {
-    if (!parsingArgs) {
-      parsingArgs = 1;
+  while (curr_arg[0] != NULL) {
+    if (!new_proc) {
+      new_proc = 1;
       last_proc = curr_proc;
-      curr_proc = init_proc(argv);
+      curr_proc = init_proc(curr_arg);
       if (first_proc == NULL) {
-        first_proc = curr_proc->next = curr_proc->prev = curr_proc;
+        first_proc = curr_proc;
+        curr_proc->next = curr_proc;
+        curr_proc->prev = curr_proc;
       } else {
         last_proc->next = curr_proc;
         curr_proc->next = first_proc;
@@ -122,11 +110,11 @@ int main(int argc, char *argv[]) {
         first_proc->prev = curr_proc;
       }
     } else {
-      if (**argv == ':') {
-        argv[0] = NULL;
-        parsingArgs = 0;
+      if (**curr_arg == ':') {
+        curr_arg[0] = NULL;
+        new_proc = 0;
       }
-      argv++;
+      curr_arg++;
     }
   }
 

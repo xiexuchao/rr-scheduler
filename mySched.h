@@ -25,8 +25,8 @@ struct context_st {
 extern void new_itimer(int quantum);
 extern struct context_st* init_proc(char** args);
 extern struct context_st* remove_proc(struct context_st *first_proc);
-extern void run_proc(struct context_st* proc);
-extern char* append_path(char *arg);
 extern void run_all_procs(struct context_st *first_proc, int quantum);
+extern void alarm_sig_catch(int signum);
+extern void fork_all_procs(struct context_st *first_proc);
 
 #endif
