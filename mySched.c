@@ -1,8 +1,20 @@
 #include "mySched.h"
 
+struct itimerval new_itimer(int quantum) {
+  struct itimerval itimer;
+  itimer.it_interval.tv_sec=quantum;
+  itimer.it_interval.tv_usec=quantum*1000;
+  itimer.it_value.tv_sec=quantum;
+  itimer.it_value.tv_usec=quantum*1000;
+  return itimer;
+}
+
 void run_proc(proc_context* proc, int quantum) {
   int status;
   pid_t child;
+  //struct sigaction new_action;
+  //struct itimerval itimer = new_itimer(quantum);
+  //setitimer(ITIMER_REAL, &itimer, NULL);
 
   child = fork();
 

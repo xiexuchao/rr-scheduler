@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <signal.h>
+#include <sys/time.h>
 
 #define MAX_PRCESSES 100
 #define MAX_ARGUMENTS 10
@@ -12,6 +14,7 @@ typedef struct context_st {
   struct proc_context *next;
 } proc_context;
 
+extern struct itimerval new_itimer(int quantum);
 extern proc_context* add_proc(char** args, int arg_counter);
 extern void run_proc(proc_context* proc, int quantum);
 extern char* append_path(char *arg);
