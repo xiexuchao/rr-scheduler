@@ -11,8 +11,6 @@
 #define MAX_PROCESSES 100
 #define MAX_ARGUMENTS 10
 #define SEC_TO_USEC 1000
-#define RE 0
-#define WE 1
 
 struct context_st {
   pid_t pid;
@@ -21,6 +19,10 @@ struct context_st {
   struct context_st *next;
   struct context_st *prev;
 };
+
+extern struct itimerval intervalTimer;
+extern struct sigaction alarmSig;
+extern int curr_pid;
 
 extern void new_itimer(int quantum);
 extern struct context_st* init_proc(char** args);

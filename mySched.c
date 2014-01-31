@@ -41,8 +41,7 @@ struct context_st* remove_proc(struct context_st *curr_proc) {
   struct context_st *temp = curr_proc;
   if (curr_proc->prev == curr_proc || curr_proc->next == curr_proc) {
     free(temp);
-    temp = NULL;
-    return temp;
+    return NULL;
   }
   curr_proc = temp->next;
   (temp->prev)->next = temp->next;
@@ -68,7 +67,8 @@ void run_all_procs(struct context_st *first_proc, int quantum) {
     setitimer(ITIMER_REAL, &intervalTimer, NULL);
     my_pid = waitpid(curr_proc->pid, &status, WUNTRACED);
 
-    if (my_pid > 0 && (WIFEXITED(status) || WIFSIGNALED(status))) {
+    if (my_pid > 0 && (WIFEXITED(status))
+      && !(WSTOPSIG(status)) && !(WIFSTOPPED(status))) {
       curr_proc = remove_proc(curr_proc);
     } else {
       curr_proc = curr_proc->next;
@@ -110,7 +110,7 @@ int main(int argc, char *argv[]) {
         first_proc->prev = curr_proc;
       }
     } else {
-      if (**curr_arg == ':') {
+      if (strcmp(curr_arg[0], ":") == 0) {
         curr_arg[0] = NULL;
         new_proc = 0;
       }
