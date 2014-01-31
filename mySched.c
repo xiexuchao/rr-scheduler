@@ -22,8 +22,8 @@ void fork_all_procs(struct context_st *first_proc) {
   while(curr_proc->pid == -1) {
     if (child = fork()) {
       curr_proc->pid = child;
+      kill(child, SIGSTOP);
     } else {
-      raise(SIGSTOP);
       execvp(curr_proc->command, curr_proc->args);
       exit(1);
     }
@@ -63,8 +63,8 @@ void run_all_procs(struct context_st *first_proc, int quantum) {
   while(curr_proc) {
     curr_pid = curr_proc->pid;
     new_itimer(quantum);
-    kill(curr_proc->pid, SIGCONT);
     setitimer(ITIMER_REAL, &intervalTimer, NULL);
+    kill(curr_proc->pid, SIGCONT);
     my_pid = waitpid(curr_proc->pid, &status, WUNTRACED);
 
     if (my_pid > 0 && (WIFEXITED(status))
