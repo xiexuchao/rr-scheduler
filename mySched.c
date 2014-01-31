@@ -1,39 +1,21 @@
 #include "mySched.h"
 
-struct itimerval new_itimer(int quantum) {
-  struct itimerval itimer;
-  itimer.it_interval.tv_sec=quantum;
-  itimer.it_interval.tv_usec=quantum*1000;
-  itimer.it_value.tv_sec=quantum;
-  itimer.it_value.tv_usec=quantum*1000;
-  return itimer;
-}
+struct itimerval intervalTimer;
+struct sigaction alarmSig;
+int pid;
+int quantum;
 
-void run_proc(proc_context* proc, int quantum) {
-  int status;
-  pid_t child;
-  //struct sigaction new_action;
-  //struct itimerval itimer = new_itimer(quantum);
-  //setitimer(ITIMER_REAL, &itimer, NULL);
-
-  child = fork();
-
-  if (child) {
-    waitpid(child, &status, 0);
-  } else {
-    execvp(proc->command, proc->args);
-    exit(-1);
-  }
-}
-
-proc_context* add_proc(char** args, int arg_counter) {
-  args[arg_counter] = NULL;
-  proc_context *proc = malloc(sizeof(proc_context));
-  proc->command = args[0];
+// creates proc context
+struct context_st* init_proc(char** args) {
+  //args[arg_counter] = NULL;
+  struct context_st *proc = malloc(sizeof(struct context_st));
   proc->args = args;
+  proc->command = proc->args[0];
+  proc->pid = -1;
   return proc;
 }
 
+// sets path string for command for executables
 char* append_path(char *arg) {
   int str_len = strlen(arg) + strlen("./");
   char *str = malloc(sizeof(char) * str_len);
@@ -42,49 +24,110 @@ char* append_path(char *arg) {
   return str;
 }
 
-void run_all_procs(proc_context *curr_proc, int quantum) {
-  while(curr_proc) {
-    run_proc(curr_proc, quantum);
+// Creates all the child processes, sets up piping for debugging output
+// And immediately stops the children as they're created.
+void fork_all_procs(struct context_st *curr_proc) {
+  int child;
+
+  while(curr_proc->pid == -1) {
+    if (child = fork()) {
+      curr_proc->pid = child;
+    } else {
+      raise(SIGSTOP);
+      execvp(curr_proc->command, curr_proc->args);
+      exit(1);
+    }
     curr_proc = curr_proc->next;
   }
 }
 
+// Catches sig and stops proc
+void alarm_sig_catch(int signum) {
+  kill(pid, SIGSTOP);
+}
+
+// remove finished proc from linked list and free
+struct context_st* remove_proc(struct context_st *curr_proc) {
+  struct context_st *temp = curr_proc;
+  if (curr_proc->prev == curr_proc) {
+    free(temp);
+    temp = NULL;
+    return temp;
+  } else {
+    curr_proc = (temp->prev)->next = temp->next;
+    (temp->next)->prev = temp->prev;
+  }
+  free(temp);
+  return curr_proc;
+}
+
+// Function to run the round robin.
+void run_all_procs(struct context_st *curr_proc) {
+  int status;
+  pid_t my_pid;
+
+  memset(&alarmSig, 0, sizeof (alarmSig));
+  alarmSig.sa_handler = &alarm_sig_catch;
+  sigaction(SIGALRM, &alarmSig, NULL);
+
+  while(curr_proc) {
+    pid = curr_proc->pid;
+    kill(curr_proc->pid, SIGCONT);
+    new_itimer();
+    setitimer(ITIMER_REAL, &intervalTimer, NULL);
+    my_pid = waitpid(curr_proc->pid, &status, WUNTRACED);
+
+    if (my_pid > 0 && (WIFEXITED(status) || WIFSIGNALED(status))) {
+      curr_proc = remove_proc(curr_proc);
+    } else {
+      curr_proc = curr_proc->next;
+    }
+  }
+}
+
+// sets up the timer
+void new_itimer() {
+  intervalTimer.it_interval.tv_sec = 0;
+  intervalTimer.it_interval.tv_usec = 0;
+  intervalTimer.it_value.tv_sec = quantum / 1000;
+  intervalTimer.it_value.tv_usec = (quantum % SEC_TO_USEC) * SEC_TO_USEC;
+}
+
+// parses input and starts schedule
 int main(int argc, char *argv[]) {
   // 0 is schedule, 1 is quantum, 2 starts args
-  int quantum = strtol(argv[1], NULL, 0);
+  quantum = strtol(argv[1], NULL, 0);
   int index = 2;
   char *args[MAX_ARGUMENTS];
   int arg_counter = 0;
-  proc_context* last_proc = NULL;
-  proc_context* curr_proc = NULL;
-  proc_context* first_proc = NULL;
+  struct context_st *curr_proc = NULL;
+  struct context_st *first_proc = NULL;
 
-  while (index < argc) {
-    if (strcmp(argv[index], ":") == 0) {
-      curr_proc = add_proc(args, arg_counter);
-      if (last_proc != NULL) {
-        last_proc->next = curr_proc;
-      }
+  new_itimer(quantum);
+  argv = argv + 2;
+  int parsingArgs = 0;
+  while (*argv) {
+    if (!parsingArgs) {
+      parsingArgs = 1;
+      struct context_st *last_proc = curr_proc;
+      curr_proc = init_proc(argv);
       if (first_proc == NULL) {
-        first_proc = curr_proc;
-        run_proc(first_proc, quantum);
-      }
-      last_proc = curr_proc;
-      while (arg_counter > 0) {
-        args[arg_counter] = NULL;
-        arg_counter--;
+        first_proc = curr_proc->next = curr_proc->prev = curr_proc;
+      } else {
+        last_proc->next = curr_proc;
+        curr_proc->next = first_proc;
+        curr_proc->prev = last_proc;
+        first_proc->prev = curr_proc;
       }
     } else {
-      if (arg_counter == 0) {
-        args[arg_counter] = append_path(argv[index]);
-      } else {
-        args[arg_counter] = argv[index];
+      if (**argv == ':') {
+        *argv = NULL;
+        parsingArgs = 0;
       }
-      arg_counter++;
+      argv++;
     }
-    index++;
   }
-  curr_proc = add_proc(args, arg_counter);
 
-  run_all_procs(first_proc, quantum);
+  fork_all_procs(first_proc);
+  run_all_procs(first_proc);
 }
